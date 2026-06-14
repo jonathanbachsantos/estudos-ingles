@@ -122,6 +122,8 @@ export default function App() {
   const audioCtxRef = useRef(null);
   const silentNodeRef = useRef(null);
   const silentAudioElRef = useRef(null);
+  const advanceNodeRef = useRef(null);
+  const advancedRef = useRef(false);
 
   // Sincronizar referências
   useEffect(() => { autoplayRef.current = autoplay; }, [autoplay]);
@@ -303,6 +305,63 @@ export default function App() {
       } catch (e) {}
       silentAudioElRef.current = null;
     }
+    // também cancela qualquer agendamento pendente
+    try { stopScheduledAdvance(); } catch (e) {}
+  };
+
+  // Scheduler de avanço usando AudioBufferSource (funciona mesmo quando timers são suspensos)
+  const stopScheduledAdvance = () => {
+    if (advanceNodeRef.current) {
+      try { advanceNodeRef.current.stop(); } catch (e) {}
+      advanceNodeRef.current = null;
+    }
+  };
+
+  const estimateSpeechDuration = (text, lang, rate) => {
+    const words = (text || '').split(/\s+/).filter(Boolean).length || 1;
+    // estimativa: 2.5 palavras por segundo base, ajustada pela taxa
+    const baseWps = 2.5;
+    const adjRate = (rate && typeof rate === 'number') ? rate : (lang.startsWith('en') ? speechRate : 0.95);
+    const seconds = words / (baseWps * (adjRate || 1));
+    return Math.max(0.6, seconds);
+  };
+
+  const scheduleAdvance = (seconds) => {
+    try {
+      if (!audioCtxRef.current) startSilentAudioTracker();
+      if (!audioCtxRef.current) return;
+
+      stopScheduledAdvance();
+      advancedRef.current = false;
+
+      const ctx = audioCtxRef.current;
+      const sampleRate = ctx.sampleRate || 44100;
+      const length = Math.ceil(sampleRate * seconds);
+      const buffer = ctx.createBuffer(1, length, sampleRate);
+      // buffer já silencioso (zeros)
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = false;
+
+      // Mute via gain para evitar qualquer som
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      src.connect(gain);
+      gain.connect(ctx.destination);
+
+      src.onended = () => {
+        advanceNodeRef.current = null;
+        if (!advancedRef.current && autoplayRef.current) {
+          advancedRef.current = true;
+          try { handleNext(); } catch (e) {}
+        }
+      };
+
+      advanceNodeRef.current = src;
+      try { src.start(); } catch (e) { console.warn('Falha ao iniciar advance node:', e); }
+    } catch (e) {
+      console.warn('Erro ao agendar avanço:', e);
+    }
   };
 
   // MEDIA SESSION API (Controladores e Informações na Tela de Bloqueio do Telemóvel/Celular)
@@ -330,17 +389,27 @@ export default function App() {
   // Avançar e Voltar
   const handleNext = () => {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    advancedRef.current = true;
+    try { stopScheduledAdvance(); } catch (e) {}
     setIsFlipped(false);
     setCurrentIndex(prev => (prev + 1) % filteredData.length);
   };
 
   const handlePrev = () => {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    advancedRef.current = true;
+    try { stopScheduledAdvance(); } catch (e) {}
     setIsFlipped(false);
     setCurrentIndex(prev => (prev - 1 + filteredData.length) % filteredData.length);
   };
 
   // Função de síntese de voz (TTS)
+
+  // Reseta estado do agendador ao trocar de card
+  useEffect(() => {
+    advancedRef.current = false;
+    try { stopScheduledAdvance(); } catch (e) {}
+  }, [currentIndex]);
   const speakText = (text, lang = 'en-US', onDoneCallback = null) => {
     if (!('speechSynthesis' in window)) {
       return;
@@ -388,6 +457,9 @@ export default function App() {
       }
       // Para o tracker silencioso ao terminar a fala
       stopSilentAudioTracker();
+      // Cancel scheduler e marca como avançado para evitar duplicidade
+      stopScheduledAdvance();
+      advancedRef.current = true;
       
       if (onDoneCallback) {
         onDoneCallback();
@@ -396,6 +468,7 @@ export default function App() {
         if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
         speechTimeoutRef.current = setTimeout(() => {
           if (autoplayRef.current) {
+            advancedRef.current = true;
             handleNext();
           }
         }, 1800);
@@ -406,10 +479,23 @@ export default function App() {
       setIsPlaying(false);
       // Assegura parada do tracker em caso de erro
       stopSilentAudioTracker();
+      stopScheduledAdvance();
+      advancedRef.current = true;
     };
 
-    window.speechSynthesis.speak(utterance);
-  };
+    // Antes de falar, prepare scheduler baseado em estimativa de duração
+    try {
+      stopScheduledAdvance();
+      advancedRef.current = false;
+      if (autoplayRef.current) {
+        const est = estimateSpeechDuration(text, lang, utterance.rate);
+        // adiciona pequena margem
+        scheduleAdvance(est + 0.6);
+      }
+    } catch (e) {}
+
+     window.speechSynthesis.speak(utterance);
+   };
 
     // Reage a mudanças de visibilidade para tentar reativar o tracker/wake lock
     useEffect(() => {
