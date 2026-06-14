@@ -613,14 +613,9 @@ export default function App() {
             }
           });
         } else {
-          // INGLÊS EXCLUSIVO: vira o card com delay fixo mesmo se a tela estiver desligada
-          speakText(currentCard.pt, 'pt-BR');
-          scheduleAdvance(2.5, () => {
-            if (!advancedRef.current && autoplayRef.current) {
-              advancedRef.current = true;
-              setIsFlipped(true);
-            }
-          });
+          // INGLÊS EXCLUSIVO: vira o card imediatamente e deixa o effect falar EN em seguida
+          advancedRef.current = true;
+          setIsFlipped(true);
         }
       } else {
         // Lê Inglês e agenda avançar para o próximo card
