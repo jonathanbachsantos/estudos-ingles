@@ -122,6 +122,7 @@ export default function App() {
   const audioCtxRef = useRef(null);
   const silentNodeRef = useRef(null);
   const silentAudioElRef = useRef(null);
+  const advanceAudioElRef = useRef(null);
   const advanceNodeRef = useRef(null);
   const advancedRef = useRef(false);
 
@@ -253,13 +254,13 @@ export default function App() {
   }, [keepScreenOn]);
 
   // TRUQUE DO ÁUDIO SILENCIOSO (Web Audio API) para manter a thread ativa no background / tela apagada
-  const startSilentAudioTracker = () => {
+  const startSilentAudioTracker = async () => {
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
       if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
+        await audioCtxRef.current.resume();
       }
       if (silentNodeRef.current) return;
       
@@ -310,6 +311,49 @@ export default function App() {
     try { stopScheduledAdvance(); } catch (e) {}
   };
 
+  const stopAdvanceAudio = () => {
+    if (advanceAudioElRef.current) {
+      try {
+        advanceAudioElRef.current.pause();
+        URL.revokeObjectURL(advanceAudioElRef.current.src);
+      } catch (e) {}
+      advanceAudioElRef.current = null;
+    }
+  };
+
+  const createSilentWavBlob = (seconds) => {
+    const sampleRate = 22050;
+    const channels = 1;
+    const bytesPerSample = 2;
+    const blockAlign = channels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const length = Math.max(1, Math.floor(seconds * sampleRate));
+    const dataSize = length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    const writeString = (offset, str) => {
+      for (let i = 0; i < str.length; i += 1) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, channels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bytesPerSample * 8, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
   // Scheduler de avanço usando AudioBufferSource (funciona mesmo quando timers são suspensos)
   const stopScheduledAdvance = () => {
     if (advanceNodeRef.current) {
@@ -327,28 +371,66 @@ export default function App() {
     return Math.max(0.6, seconds);
   };
 
-  const scheduleAdvance = (seconds, callback = null) => {
+  const scheduleAdvance = async (seconds, callback = null) => {
     try {
-      if (!audioCtxRef.current) {
-        startSilentAudioTracker();
-      } else if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      if (!audioCtxRef.current) return;
-
+      stopAdvanceAudio();
       stopScheduledAdvance();
       advancedRef.current = false;
+
+      if (typeof seconds !== 'number' || seconds <= 0) {
+        seconds = 1;
+      }
+
+      // Primeiro tenta usar a rota via HTMLAudio para tornar o agendamento mais robusto
+      try {
+        const silentBlob = createSilentWavBlob(seconds);
+        const url = URL.createObjectURL(silentBlob);
+        const audio = new Audio(url);
+        audio.volume = 0;
+        audio.preload = 'auto';
+
+        audio.onended = () => {
+          advanceAudioElRef.current = null;
+          URL.revokeObjectURL(url);
+          if (!advancedRef.current && autoplayRef.current) {
+            advancedRef.current = true;
+            try {
+              if (typeof callback === 'function') {
+                callback();
+              } else {
+                handleNext();
+              }
+            } catch (e) {
+              console.warn('Falha no callback de avanço:', e);
+            }
+          }
+        };
+
+        advanceAudioElRef.current = audio;
+        audio.play().catch((e) => {
+          console.warn('Falha ao tocar áudio de avanço:', e);
+          stopAdvanceAudio();
+        });
+        return;
+      } catch (audioError) {
+        console.warn('Fallback de áudio silencioso falhou:', audioError);
+      }
+
+      if (!audioCtxRef.current) {
+        await startSilentAudioTracker();
+      } else if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+      if (!audioCtxRef.current) return;
 
       const ctx = audioCtxRef.current;
       const sampleRate = ctx.sampleRate || 44100;
       const length = Math.ceil(sampleRate * seconds);
       const buffer = ctx.createBuffer(1, length, sampleRate);
-      // buffer já silencioso (zeros)
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.loop = false;
 
-      // Mute via gain para evitar qualquer som
       const gain = ctx.createGain();
       gain.gain.value = 0;
       src.connect(gain);
