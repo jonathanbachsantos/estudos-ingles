@@ -261,6 +261,7 @@ export default function App() {
       if (audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
       }
+      if (silentNodeRef.current) return;
       
       // Cria um buffer silencioso que roda infinitamente
       const buffer = audioCtxRef.current.createBuffer(1, audioCtxRef.current.sampleRate, audioCtxRef.current.sampleRate);
@@ -326,9 +327,13 @@ export default function App() {
     return Math.max(0.6, seconds);
   };
 
-  const scheduleAdvance = (seconds) => {
+  const scheduleAdvance = (seconds, callback = null) => {
     try {
-      if (!audioCtxRef.current) startSilentAudioTracker();
+      if (!audioCtxRef.current) {
+        startSilentAudioTracker();
+      } else if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
       if (!audioCtxRef.current) return;
 
       stopScheduledAdvance();
@@ -353,7 +358,15 @@ export default function App() {
         advanceNodeRef.current = null;
         if (!advancedRef.current && autoplayRef.current) {
           advancedRef.current = true;
-          try { handleNext(); } catch (e) {}
+          try {
+            if (typeof callback === 'function') {
+              callback();
+            } else {
+              handleNext();
+            }
+          } catch (e) {
+            console.warn('Falha no callback de avanço:', e);
+          }
         }
       };
 
@@ -445,8 +458,6 @@ export default function App() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
       }
-      // Inicia o tracker de áudio silencioso para ajudar a manter a reprodução
-      // ativa em background / quando a tela estiver bloqueada
       startSilentAudioTracker();
     };
     
@@ -455,19 +466,14 @@ export default function App() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
-      // Para o tracker silencioso ao terminar a fala
-      stopSilentAudioTracker();
-      // Cancel scheduler e marca como avançado para evitar duplicidade
-      stopScheduledAdvance();
-      advancedRef.current = true;
-      
-      if (onDoneCallback) {
+      // Não para o tracker de keepalive aqui; ele permanece até o autoplay ser desativado.
+      if (onDoneCallback && !advancedRef.current) {
         onDoneCallback();
-      } else if (autoplayRef.current && lang.startsWith('en')) {
-        // No autoplay, aguarda 1.8 segundos de respiro e avança
+      }
+      if (autoplayRef.current && lang.startsWith('en') && !advancedRef.current) {
         if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
         speechTimeoutRef.current = setTimeout(() => {
-          if (autoplayRef.current) {
+          if (autoplayRef.current && !advancedRef.current) {
             advancedRef.current = true;
             handleNext();
           }
@@ -477,24 +483,11 @@ export default function App() {
 
     utterance.onerror = () => {
       setIsPlaying(false);
-      // Assegura parada do tracker em caso de erro
-      stopSilentAudioTracker();
       stopScheduledAdvance();
       advancedRef.current = true;
     };
 
-    // Antes de falar, prepare scheduler baseado em estimativa de duração
-    try {
-      stopScheduledAdvance();
-      advancedRef.current = false;
-      if (autoplayRef.current) {
-        const est = estimateSpeechDuration(text, lang, utterance.rate);
-        // adiciona pequena margem
-        scheduleAdvance(est + 0.6);
-      }
-    } catch (e) {}
-
-     window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
    };
 
     // Reage a mudanças de visibilidade para tentar reativar o tracker/wake lock
@@ -514,37 +507,55 @@ export default function App() {
   // CONTROLES DO AUTOPLAY BILINGUE
   useEffect(() => {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    stopScheduledAdvance();
+    advancedRef.current = false;
 
     if (autoplay && currentCard) {
-      // Inicia rastreador de silêncio para a thread JS não suspender
+      // Mantém o keepalive de áudio rodando enquanto o autoplay estiver ativo
       startSilentAudioTracker();
 
       if (!isFlipped) {
         if (autoplayBilingualRef.current) {
-          // BILÍNGUE: Fala Português -> Espera 2s -> Vira Card
+          // BILÍNGUE: Fala Português e agenda virar o card após o tempo estimado + margem
+          const seconds = estimateSpeechDuration(currentCard.pt, 'pt-BR', 0.95) + 2.0;
           speakText(currentCard.pt, 'pt-BR', () => {
-            speechTimeoutRef.current = setTimeout(() => {
-              if (autoplayRef.current) {
-                setIsFlipped(true);
-              }
-            }, 2000);
-          });
-        } else {
-          // INGLÊS EXCLUSIVO: Espera 2.5s -> Vira Card
-          speechTimeoutRef.current = setTimeout(() => {
-            if (autoplayRef.current) {
+            if (!advancedRef.current && autoplayRef.current) {
+              advancedRef.current = true;
               setIsFlipped(true);
             }
-          }, 2500);
+          });
+          scheduleAdvance(seconds, () => {
+            if (!advancedRef.current && autoplayRef.current) {
+              advancedRef.current = true;
+              setIsFlipped(true);
+            }
+          });
+        } else {
+          // INGLÊS EXCLUSIVO: vira o card com delay fixo mesmo se a tela estiver desligada
+          speakText(currentCard.pt, 'pt-BR');
+          scheduleAdvance(2.5, () => {
+            if (!advancedRef.current && autoplayRef.current) {
+              advancedRef.current = true;
+              setIsFlipped(true);
+            }
+          });
         }
       } else {
-        // Lê Inglês
+        // Lê Inglês e agenda avançar para o próximo card
+        const seconds = estimateSpeechDuration(currentCard.en, 'en-US', speechRate) + 1.8;
         speakText(currentCard.en, 'en-US');
+        scheduleAdvance(seconds, () => {
+          if (!advancedRef.current && autoplayRef.current) {
+            advancedRef.current = true;
+            handleNext();
+          }
+        });
       }
     }
 
     return () => {
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+      stopScheduledAdvance();
     };
   }, [currentIndex, isFlipped, autoplay, autoplayBilingual]);
 
