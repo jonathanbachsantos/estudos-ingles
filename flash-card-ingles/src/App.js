@@ -121,6 +121,7 @@ export default function App() {
   const wakeLockRef = useRef(null);
   const audioCtxRef = useRef(null);
   const silentNodeRef = useRef(null);
+  const silentAudioElRef = useRef(null);
 
   // Sincronizar referências
   useEffect(() => { autoplayRef.current = autoplay; }, [autoplay]);
@@ -183,6 +184,23 @@ export default function App() {
     }
   };
 
+  const ensureAudioActive = async () => {
+    try {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+    } catch (e) {
+      // ignore
+    }
+    try {
+      if (silentAudioElRef.current && silentAudioElRef.current.paused) {
+        await silentAudioElRef.current.play();
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     loadVoices();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -203,6 +221,13 @@ export default function App() {
     if ('wakeLock' in navigator) {
       try {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
+        if (wakeLockRef.current && typeof wakeLockRef.current.addEventListener === 'function') {
+          wakeLockRef.current.addEventListener('release', () => {
+            if (keepScreenOn) {
+              setTimeout(() => { try { requestWakeLock(); } catch(e) {} }, 500);
+            }
+          });
+        }
       } catch (err) {
         console.warn("Wake Lock falhou:", err);
       }
@@ -243,6 +268,22 @@ export default function App() {
       source.connect(audioCtxRef.current.destination);
       source.start();
       silentNodeRef.current = source;
+      // Fallback: cria um elemento <audio> com WAV silencioso em loop.
+      if (!silentAudioElRef.current) {
+        try {
+          const silentWav = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+          const a = new Audio(silentWav);
+          a.loop = true;
+          a.volume = 0;
+          a.play().then(() => {
+            silentAudioElRef.current = a;
+          }).catch((err) => {
+            console.warn('Não foi possível tocar áudio silencioso:', err);
+          });
+        } catch (e) {
+          console.warn('Erro ao criar elemento de áudio silencioso:', e);
+        }
+      }
     } catch (e) {
       console.warn("Navegador impediu execução de áudio silencioso:", e);
     }
@@ -254,6 +295,13 @@ export default function App() {
         silentNodeRef.current.stop();
       } catch (e) {}
       silentNodeRef.current = null;
+    }
+    if (silentAudioElRef.current) {
+      try {
+        silentAudioElRef.current.pause();
+        silentAudioElRef.current.src = '';
+      } catch (e) {}
+      silentAudioElRef.current = null;
     }
   };
 
@@ -299,6 +347,8 @@ export default function App() {
     }
 
     window.speechSynthesis.cancel(); // Evita sobreposição
+    // Tenta garantir que o AudioContext / tracker esteja ativo antes de falar
+    try { ensureAudioActive(); } catch(e) {}
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
@@ -360,6 +410,20 @@ export default function App() {
 
     window.speechSynthesis.speak(utterance);
   };
+
+    // Reage a mudanças de visibilidade para tentar reativar o tracker/wake lock
+    useEffect(() => {
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          if (keepScreenOn) requestWakeLock();
+          try { ensureAudioActive(); } catch (e) {}
+        }
+      };
+
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, [keepScreenOn]);
+
 
   // CONTROLES DO AUTOPLAY BILINGUE
   useEffect(() => {
