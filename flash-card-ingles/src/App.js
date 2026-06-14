@@ -224,8 +224,10 @@ export default function App() {
     if ('wakeLock' in navigator) {
       try {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.debug('WakeLock acquired');
         if (wakeLockRef.current && typeof wakeLockRef.current.addEventListener === 'function') {
           wakeLockRef.current.addEventListener('release', () => {
+            console.debug('WakeLock released');
             if (keepScreenOn) {
               setTimeout(() => { try { requestWakeLock(); } catch(e) {} }, 500);
             }
@@ -256,13 +258,20 @@ export default function App() {
   // TRUQUE DO ÁUDIO SILENCIOSO (Web Audio API) para manter a thread ativa no background / tela apagada
   const startSilentAudioTracker = async () => {
     try {
+      console.debug('startSilentAudioTracker invoked');
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        console.debug('AudioContext created');
       }
+      console.debug('AudioContext state before resume:', audioCtxRef.current.state);
       if (audioCtxRef.current.state === 'suspended') {
         await audioCtxRef.current.resume();
+        console.debug('AudioContext resumed');
       }
-      if (silentNodeRef.current) return;
+      if (silentNodeRef.current) {
+        console.debug('silentNode already running');
+        return;
+      }
       
       const ctx = audioCtxRef.current;
       const gain = ctx.createGain();
@@ -275,6 +284,7 @@ export default function App() {
         source.offset.value = 0;
         source.connect(gain);
         source.start();
+        console.debug('ConstantSourceNode started');
       } else {
         const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -286,6 +296,7 @@ export default function App() {
         source.loop = true;
         source.connect(gain);
         source.start();
+        console.debug('BufferSource silent tracker started');
       }
       silentNodeRef.current = source;
       // Fallback: cria um elemento <audio> com WAV silencioso em loop.
@@ -312,12 +323,14 @@ export default function App() {
   const stopSilentAudioTracker = () => {
     if (silentNodeRef.current) {
       try {
+        console.debug('Stopping silentNode');
         silentNodeRef.current.stop();
-      } catch (e) {}
+      } catch (e) { console.warn('Error stopping silentNode', e); }
       silentNodeRef.current = null;
     }
     if (silentAudioElRef.current) {
       try {
+        console.debug('Stopping silentAudioEl');
         silentAudioElRef.current.pause();
         silentAudioElRef.current.src = '';
       } catch (e) {}
@@ -330,6 +343,7 @@ export default function App() {
   const stopAdvanceAudio = () => {
     if (advanceAudioElRef.current) {
       try {
+        console.debug('Stopping advanceAudioEl');
         advanceAudioElRef.current.pause();
         URL.revokeObjectURL(advanceAudioElRef.current.src);
       } catch (e) {}
@@ -389,6 +403,7 @@ export default function App() {
 
   const scheduleAdvance = async (seconds, callback = null) => {
     try {
+      console.debug('scheduleAdvance requested, seconds=', seconds);
       stopAdvanceAudio();
       stopScheduledAdvance();
       advancedRef.current = false;
@@ -401,11 +416,13 @@ export default function App() {
       try {
         const silentBlob = createSilentWavBlob(seconds);
         const url = URL.createObjectURL(silentBlob);
+        console.debug('scheduleAdvance using HTMLAudio fallback, url=', url);
         const audio = new Audio(url);
         audio.volume = 0;
         audio.preload = 'auto';
 
         audio.onended = () => {
+          console.debug('advanceAudio onended');
           advanceAudioElRef.current = null;
           URL.revokeObjectURL(url);
           if (!advancedRef.current && autoplayRef.current) {
@@ -423,7 +440,9 @@ export default function App() {
         };
 
         advanceAudioElRef.current = audio;
-        audio.play().catch((e) => {
+        audio.play().then(() => {
+          console.debug('advanceAudio play started');
+        }).catch((e) => {
           console.warn('Falha ao tocar áudio de avanço:', e);
           stopAdvanceAudio();
         });
@@ -552,15 +571,17 @@ export default function App() {
 
     utterance.onstart = () => {
       setIsPlaying(true);
+      console.debug('utterance.onstart', { lang });
       // Notifica o SO que a reprodução iniciou para manter vivo o background
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
       }
-      startSilentAudioTracker();
+      try { startSilentAudioTracker(); } catch (e) { console.warn('startSilentAudioTracker error', e); }
     };
     
     utterance.onend = () => {
       setIsPlaying(false);
+      console.debug('utterance.onend', { lang });
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
@@ -581,6 +602,7 @@ export default function App() {
 
     utterance.onerror = () => {
       setIsPlaying(false);
+      console.warn('utterance.onerror');
       stopScheduledAdvance();
       advancedRef.current = true;
     };
@@ -591,9 +613,10 @@ export default function App() {
     // Reage a mudanças de visibilidade para tentar reativar o tracker/wake lock
     useEffect(() => {
       const onVisibilityChange = () => {
+        console.debug('visibilitychange', document.visibilityState);
         if (document.visibilityState === 'visible') {
           if (keepScreenOn) requestWakeLock();
-          try { ensureAudioActive(); } catch (e) {}
+          try { ensureAudioActive(); } catch (e) { console.warn('ensureAudioActive error', e); }
         }
       };
 
@@ -710,6 +733,49 @@ export default function App() {
 
   const englishVoices = useMemo(() => availableVoices.filter(v => v.lang.startsWith('en')), [availableVoices]);
   const portugueseVoices = useMemo(() => availableVoices.filter(v => v.lang.startsWith('pt')), [availableVoices]);
+
+  // In-app logging (captura do console para diagnóstico sem Safari Inspector)
+  const logsRef = useRef([]);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const pushLog = (level, ...args) => {
+    const text = args.map(a => {
+      try { return typeof a === 'string' ? a : JSON.stringify(a); } catch (e) { return String(a); }
+    }).join(' ');
+    const entry = { ts: new Date().toISOString(), level, text };
+    logsRef.current.push(entry);
+    try { localStorage.setItem('fc_logs', JSON.stringify(logsRef.current.slice(-2000))); } catch (e) {}
+  };
+
+  useEffect(() => {
+    try {
+      const prev = JSON.parse(localStorage.getItem('fc_logs') || '[]');
+      if (Array.isArray(prev) && prev.length) logsRef.current = prev;
+    } catch (e) {}
+
+    const orig = { log: console.log, debug: console.debug, warn: console.warn, error: console.error };
+    console.log = (...a) => { pushLog('log', ...a); orig.log.apply(console, a); };
+    console.debug = (...a) => { pushLog('debug', ...a); orig.debug.apply(console, a); };
+    console.warn = (...a) => { pushLog('warn', ...a); orig.warn.apply(console, a); };
+    console.error = (...a) => { pushLog('error', ...a); orig.error.apply(console, a); };
+
+    return () => {
+      console.log = orig.log; console.debug = orig.debug; console.warn = orig.warn; console.error = orig.error;
+    };
+  }, []);
+
+  const exportLogs = () => {
+    try {
+      const text = logsRef.current.map(e => `${e.ts} [${e.level}] ${e.text}`).join('\n');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'flashcard-logs.txt'; document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.warn('Falha ao exportar logs', e); }
+  };
+
+  const clearLogs = () => { logsRef.current = []; try { localStorage.removeItem('fc_logs'); } catch (e) {} };
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
@@ -1266,6 +1332,29 @@ export default function App() {
           Pratique as respostas, domine os jargões corporativos de tecnologia e sinta-se confiante para responder a perguntas difíceis. Boa sorte, Jonathan!
         </p>
       </footer>
+
+      {/* Painel de logs in-app (útil para capturar eventos após bloquear a tela) */}
+      <div className="fixed z-50 right-4 bottom-4 text-sm">
+        <div className="flex flex-col items-end">
+          <button
+            onClick={() => setShowLogs(s => !s)}
+            className="bg-slate-800/80 text-slate-200 px-3 py-2 rounded-lg border border-slate-700/60 shadow-lg"
+          >
+            {showLogs ? 'Fechar Logs' : 'Ver Logs'}
+          </button>
+
+          {showLogs && (
+            <div className="mt-2 w-96 max-h-72 bg-black/90 text-white p-2 rounded-lg border border-slate-700/60 overflow-auto">
+              <div className="flex gap-2 items-center mb-2">
+                <button onClick={exportLogs} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded text-xs">Exportar</button>
+                <button onClick={() => { try { navigator.clipboard.writeText(logsRef.current.map(e => `${e.ts} [${e.level}] ${e.text}`).join('\n')); } catch(e){ console.warn('copy failed', e); } }} className="bg-slate-700 px-2 py-1 rounded text-xs">Copiar</button>
+                <button onClick={() => { clearLogs(); }} className="bg-rose-500 px-2 py-1 rounded text-xs">Limpar</button>
+              </div>
+              <pre className="text-[11px] whitespace-pre-wrap">{logsRef.current.slice(-1000).map(e => `${e.ts} [${e.level}] ${e.text}`).join('\n')}</pre>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
