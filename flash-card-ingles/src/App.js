@@ -264,13 +264,29 @@ export default function App() {
       }
       if (silentNodeRef.current) return;
       
-      // Cria um buffer silencioso que roda infinitamente
-      const buffer = audioCtxRef.current.createBuffer(1, audioCtxRef.current.sampleRate, audioCtxRef.current.sampleRate);
-      const source = audioCtxRef.current.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      source.connect(audioCtxRef.current.destination);
-      source.start();
+      const ctx = audioCtxRef.current;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(ctx.destination);
+
+      let source;
+      if ('ConstantSourceNode' in window) {
+        source = ctx.createConstantSource();
+        source.offset.value = 0;
+        source.connect(gain);
+        source.start();
+      } else {
+        const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i += 1) {
+          data[i] = (Math.random() * 2 - 1) * 1e-6;
+        }
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        source.connect(gain);
+        source.start();
+      }
       silentNodeRef.current = source;
       // Fallback: cria um elemento <audio> com WAV silencioso em loop.
       if (!silentAudioElRef.current) {
