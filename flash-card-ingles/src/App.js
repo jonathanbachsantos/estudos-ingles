@@ -381,6 +381,14 @@ export default function App() {
     writeString(36, 'data');
     view.setUint32(40, dataSize, true);
 
+    const frequency = 440;
+    const amplitude = 0.02;
+    for (let i = 0; i < length; i += 1) {
+      const sample = Math.sin((2 * Math.PI * frequency * i) / sampleRate) * amplitude;
+      const intSample = Math.max(-32768, Math.min(32767, Math.round(sample * 32767)));
+      view.setInt16(44 + i * bytesPerSample, intSample, true);
+    }
+
     return new Blob([buffer], { type: 'audio/wav' });
   };
 
@@ -418,8 +426,18 @@ export default function App() {
         const url = URL.createObjectURL(silentBlob);
         console.debug('scheduleAdvance using HTMLAudio fallback, url=', url);
         const audio = new Audio(url);
-        audio.volume = 0;
+        audio.volume = 0.02;
         audio.preload = 'auto';
+
+        audio.onplay = () => {
+          console.debug('advanceAudio onplay');
+        };
+
+        audio.onerror = (event) => {
+          console.warn('advanceAudio onerror', event);
+          advanceAudioElRef.current = null;
+          URL.revokeObjectURL(url);
+        };
 
         audio.onended = () => {
           console.debug('advanceAudio onended');
