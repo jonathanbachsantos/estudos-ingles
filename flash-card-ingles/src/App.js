@@ -326,6 +326,9 @@ export default function App() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
       }
+      // Inicia o tracker de áudio silencioso para ajudar a manter a reprodução
+      // ativa em background / quando a tela estiver bloqueada
+      startSilentAudioTracker();
     };
     
     utterance.onend = () => {
@@ -333,6 +336,8 @@ export default function App() {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
+      // Para o tracker silencioso ao terminar a fala
+      stopSilentAudioTracker();
       
       if (onDoneCallback) {
         onDoneCallback();
@@ -349,6 +354,8 @@ export default function App() {
 
     utterance.onerror = () => {
       setIsPlaying(false);
+      // Assegura parada do tracker em caso de erro
+      stopSilentAudioTracker();
     };
 
     window.speechSynthesis.speak(utterance);
