@@ -121,6 +121,45 @@ export default function MainMenu({ onSelectGame }) {
             </div>
           </button>
 
+          {/* BINARY LAMP GAME */}
+          <button
+            onClick={() => onSelectGame('binary')}
+            className="group relative overflow-hidden rounded-3xl border border-slate-700/50 bg-slate-800/40 backdrop-blur p-8 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/10 active:scale-95"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/10 to-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            
+            <div className="relative space-y-4">
+              <div className="text-5xl">💡</div>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-white group-hover:text-cyan-300 transition-colors">
+                  Lâmpadas Mágicas do Binário
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Descubra como o código binário funciona acendendo lâmpadas e resolvendo desafios com valores digitais.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="text-emerald-400">✓</span> Aprende potências de 2 e bits
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="text-emerald-400">✓</span> Treina em modos livre, adivinhação e construção
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="text-emerald-400">✓</span> Mantém sequência de acertos e recordes
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-700/50">
+                <span className="inline-block text-xs font-bold text-cyan-400 group-hover:text-cyan-300">
+                  Jogar agora →
+                </span>
+              </div>
+            </div>
+          </button>
+
         </div>
 
         {/* STATS PREVIEW */}

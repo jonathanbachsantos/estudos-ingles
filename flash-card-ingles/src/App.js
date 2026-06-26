@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import MainMenu from './components/MainMenu';
 import DinoCodeLabGame from './components/DinoCodeLabGame';
+import BinaryLampGame from './components/BinaryLampGame';
 
 // Dados da Entrevista extraídos do PDF
 const interviewData = [
@@ -804,6 +805,10 @@ export default function App() {
 
   if (selectedGame === 'dino') {
     return <DinoCodeLabGame onBack={() => setSelectedGame('menu')} />;
+  }
+
+  if (selectedGame === 'binary') {
+    return <BinaryLampGame onBack={() => setSelectedGame('menu')} />;
   }
 
   return (
