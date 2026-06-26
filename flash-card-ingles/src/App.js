@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import MainMenu from './components/MainMenu';
+import DinoCodeLabGame from './components/DinoCodeLabGame';
 
 // Dados da Entrevista extraídos do PDF
 const interviewData = [
@@ -95,6 +97,7 @@ const interviewData = [
 const categories = ['Todos', ...new Set(interviewData.map(item => item.category))];
 
 export default function App() {
+  const [selectedGame, setSelectedGame] = useState('menu');
   const [activeTab, setActiveTab] = useState('flashcards'); // 'flashcards' | 'lista' | 'progresso'
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -794,6 +797,14 @@ export default function App() {
   };
 
   const clearLogs = () => { logsRef.current = []; try { localStorage.removeItem('fc_logs'); } catch (e) {} };
+
+  if (selectedGame === 'menu') {
+    return <MainMenu onSelectGame={setSelectedGame} />;
+  }
+
+  if (selectedGame === 'dino') {
+    return <DinoCodeLabGame onBack={() => setSelectedGame('menu')} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">

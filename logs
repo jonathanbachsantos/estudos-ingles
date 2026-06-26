@@ -1,0 +1,78 @@
+vanceAudioEl
+2026-06-14T17:51:10.214Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/43c2938b-6c77-44ae-8fe0-7adf07fe0e3d
+2026-06-14T17:51:10.217Z [debug] utterance.onstart {"lang":"en-US"}
+2026-06-14T17:51:entAudioTracker invoked
+2026-06-14T17:51:10.217Z [debug] AudioContext state before resume: interrupted
+2026-06-14T17:51:10.217Z [debug] silentN
+
+
+
+26-06-14T17:51:10.204Z [debug] Stopping advanceAudioEl
+2026-06-14T17:51:10.214Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/43c2938b-6c77-44ae-8fe0-7adf07fe0e3d
+2026-06-14T17:51:10.217Z [debug] utterance.onstart {"lang":"en-US"}
+2026-06-14T17:51:10.217Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:10.217Z [debug] AudioContext state before resume: interrupted
+2026-06-14T17:51:10.217Z [debug] silentNode already running
+
+
+
+2026-06-14T17:50:59.070Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:50:59.081Z [debug] AudioContext created
+2026-06-14T17:50:59.081Z [debug] AudioContext state before resume: suspended
+2026-06-14T17:50:59.691Z [debug] scheduleAdvance requested, seconds= 4.105263157894736
+2026-06-14T17:50:59.691Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/b74d8412-b260-4c62-99bd-e407aa642a75
+2026-06-14T17:50:59.724Z [debug] AudioContext resumed
+2026-06-14T17:50:59.726Z [debug] ConstantSourceNode started
+2026-06-14T17:50:59.816Z [debug] advanceAudio play started
+2026-06-14T17:51:00.037Z [debug] utterance.onstart {"lang":"pt-BR"}
+2026-06-14T17:51:00.037Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:00.037Z [debug] AudioContext state before resume: running
+2026-06-14T17:51:00.037Z [debug] silentNode already running
+2026-06-14T17:51:01.857Z [debug] utterance.onend {"lang":"pt-BR"}
+2026-06-14T17:51:01.867Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:01.867Z [debug] AudioContext state before resume: running
+2026-06-14T17:51:01.867Z [debug] silentNode already running
+2026-06-14T17:51:01.868Z [debug] scheduleAdvance requested, seconds= 4.152941176470589
+2026-06-14T17:51:01.868Z [debug] Stopping advanceAudioEl
+2026-06-14T17:51:01.868Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/8499b345-6023-4a60-9bbb-65cbe4b55055
+2026-06-14T17:51:01.918Z [debug] utterance.onstart {"lang":"en-US"}
+2026-06-14T17:51:01.918Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:01.918Z [debug] AudioContext state before resume: running
+2026-06-14T17:51:01.918Z [debug] silentNode already running
+2026-06-14T17:51:01.984Z [debug] advanceAudio play started
+2026-06-14T17:51:03.952Z [debug] utterance.onend {"lang":"en-US"}
+2026-06-14T17:51:05.757Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:05.757Z [debug] AudioContext state before resume: running
+2026-06-14T17:51:05.757Z [debug] silentNode already running
+2026-06-14T17:51:05.758Z [debug] scheduleAdvance requested, seconds= 5.368421052631579
+2026-06-14T17:51:05.758Z [debug] Stopping advanceAudioEl
+2026-06-14T17:51:05.759Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/c5086b46-df4e-42f5-92b6-98c84a2518bf
+2026-06-14T17:51:05.812Z [debug] utterance.onstart {"lang":"pt-BR"}
+2026-06-14T17:51:05.812Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:05.812Z [debug] AudioContext state before resume: running
+2026-06-14T17:51:05.812Z [debug] silentNode already running
+2026-06-14T17:51:05.878Z [debug] advanceAudio play started
+2026-06-14T17:51:09.204Z [debug] visibilitychange hidden
+2026-06-14T17:51:09.204Z [warn] Não foi possível tocar áudio silencioso: {}
+2026-06-14T17:51:10.199Z [debug] utterance.onend {"lang":"pt-BR"}
+2026-06-14T17:51:10.203Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:10.203Z [debug] AudioContext state before resume: interrupted
+2026-06-14T17:51:10.203Z [debug] silentNode already running
+2026-06-14T17:51:10.204Z [debug] scheduleAdvance requested, seconds= 6.035294117647059
+2026-06-14T17:51:10.204Z [debug] Stopping advanceAudioEl
+2026-06-14T17:51:10.214Z [debug] scheduleAdvance using HTMLAudio fallback, url= blob:https://jonathanbachsantos.github.io/43c2938b-6c77-44ae-8fe0-7adf07fe0e3d
+2026-06-14T17:51:10.217Z [debug] utterance.onstart {"lang":"en-US"}
+2026-06-14T17:51:10.217Z [debug] startSilentAudioTracker invoked
+2026-06-14T17:51:10.217Z [debug] AudioContext state before resume: interrupted
+2026-06-14T17:51:10.217Z [debug] silentNode already running
+2026-06-14T17:51:11.592Z [warn] Falha ao tocar áudio de avanço: {}
+2026-06-14T17:51:11.592Z [debug] Stopping advanceAudioEl
+2026-06-14T17:51:18.904Z [debug] visibilitychange visible
+2026-06-14T17:52:42.981Z [debug] visibilitychange hidden
+2026-06-14T17:53:41.699Z [debug] visibilitychange visible
+2026-06-14T17:54:11.026Z [debug] visibilitychange hidden
+2026-06-14T18:00:08.279Z [debug] visibilitychange visible
+2026-06-14T18:00:27.666Z [debug] visibilitychange hidden
+2026-06-14T18:01:14.302Z [debug] visibilitychange visible
+2026-06-14T18:01:19.364Z [debug] visibilitychange hidden
+2026-06-14T18:02:21.871Z [debug] visibilitychange visible
